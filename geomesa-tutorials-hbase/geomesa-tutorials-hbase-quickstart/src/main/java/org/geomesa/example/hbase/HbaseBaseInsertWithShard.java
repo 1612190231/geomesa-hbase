@@ -11,6 +11,7 @@ package org.geomesa.example.hbase;
 import org.apache.commons.cli.ParseException;
 import org.apache.log4j.Logger;
 import org.geomesa.example.data.GDELTData;
+import org.geomesa.example.data.TestData;
 import org.geomesa.example.quickstart.GeoMesaInsertWithShard;
 import org.locationtech.geomesa.hbase.data.HBaseDataStoreFactory;
 
@@ -19,7 +20,7 @@ public class HbaseBaseInsertWithShard extends GeoMesaInsertWithShard {
 
     // uses gdelt data
     public HbaseBaseInsertWithShard(String[] args) throws ParseException {
-        super(args, new HBaseDataStoreFactory().getParametersInfo(), new GDELTData());
+        super(args, new HBaseDataStoreFactory().getParametersInfo(), new TestData());
         baseInsert.info("HbaseBaseInsertWithShard Init...");
     }
 

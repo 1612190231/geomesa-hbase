@@ -52,8 +52,6 @@ public class TestData implements TutorialData {
     @Override
     public SimpleFeatureType getSimpleFeatureType() {
         if (sft == null) {
-            // list the attributes that constitute the feature type
-            // this is a reduced set of the attributes from GDELT 2.0
             StringBuilder attributes = new StringBuilder();
             attributes.append("truckNo:String:index=true,");
             attributes.append("utc:Date,");
@@ -64,14 +62,9 @@ public class TestData implements TutorialData {
             attributes.append("country:String,");
             attributes.append("*geom:Point:srid=4326"); // the "*" denotes the default geometry (used for indexing)
 
-            // create the simple-feature type - use the GeoMesa 'SimpleFeatureTypes' class for best compatibility
-            // may also use geotools DataUtilities or SimpleFeatureTypeBuilder, but some features may not work
             sft = SimpleFeatureTypes.createType(getTypeName(), attributes.toString());
             baseInsert.info("构建featureTypes成功...");
 
-            // use the user-data (hints) to specify which date field to use for primary indexing
-            // if not specified, the first date attribute (if any) will be used
-            // could also use ':default=true' in the attribute specification string
             sft.getUserData().put(SimpleFeatureTypes.DEFAULT_DATE_KEY, "utc");
         }
         return sft;
