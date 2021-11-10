@@ -20,6 +20,7 @@ import org.geotools.data.*;
 import org.geotools.data.simple.SimpleFeatureStore;
 import org.geotools.filter.identity.FeatureIdImpl;
 import org.geotools.util.factory.Hints;
+import org.locationtech.geomesa.index.api.ShardStrategy;
 import org.locationtech.geomesa.index.api.WritableFeature;
 import org.locationtech.geomesa.index.conf.ColumnGroups;
 import org.locationtech.geomesa.index.geotools.GeoMesaDataStore;
@@ -91,6 +92,8 @@ public abstract class GeoMesaInsertWithShard implements Runnable {
                 // 1.use gt-main's write fuction
                 writeFeatures(datastore, sft, features);
                 // 2.use geomesa-index-api's write fuction
+//                ShardStrategy strategy = new GeoMesaShardStrategy(60);
+
                 writeFeatures2(datastore, sft, features);
             }
         } catch (Exception e) {
@@ -135,7 +138,7 @@ public abstract class GeoMesaInsertWithShard implements Runnable {
         baseInsert.info("创建schema成功！");
     }
 
-    public List<SimpleFeature> getTestFeatures(TutorialData data) {
+    public List<SimpleFeature> getTestFeatures(TestData data) {
         baseInsert.info("生成测试数据集");
         List<SimpleFeature> features = data.getTestData();
         baseInsert.info("生成测试数据集成功！");
