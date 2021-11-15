@@ -13,6 +13,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.log4j.Logger;
+import org.geomesa.example.ShardGeoMesaDataStore;
 import org.geomesa.example.data.TestData;
 import org.geomesa.example.data.TutorialData;
 import org.geotools.data.DataAccessFactory.Param;
@@ -30,7 +31,7 @@ import java.util.List;
 import java.util.Map;
 
 public abstract class GeoMesaInsertWithShard implements Runnable {
-    private static Logger baseInsert = Logger.getLogger("baseInsert");
+    private static final Logger baseInsert = Logger.getLogger("baseInsert");
     private final Map<String, String> params;
     private final TestData data;
     private final boolean cleanup;
@@ -56,7 +57,6 @@ public abstract class GeoMesaInsertWithShard implements Runnable {
 
 //        logger.info(this.data.getTestData());
         baseInsert.info(this.readOnly);
-        initializeFromOptions(command);
     }
 
     public Options createOptions(Param[] parameters) {
@@ -68,14 +68,12 @@ public abstract class GeoMesaInsertWithShard implements Runnable {
         return options;
     }
 
-    public void initializeFromOptions(CommandLine command) {
-    }
-
     @Override
     public void run() {
-        DataStore datastore = null;
+        ShardGeoMesaDataStore datastore = null;
         try {
-            datastore = createDataStore(params);
+            datastore = new ShardGeoMesaDataStore(true);
+            System.out.println(datastore);
 
             if (readOnly) {
                 ensureSchema(datastore, data);
@@ -83,14 +81,11 @@ public abstract class GeoMesaInsertWithShard implements Runnable {
                 // construct column feature type
                 SimpleFeatureType sft = getSimpleFeatureType(data);
                 // create schema and reserve metadata
-                createSchema(datastore, sft);
+                datastore.createSchema(sft);
                 // get test data
                 List<SimpleFeature> features = getTestFeatures(data);
-                // 1.use gt-main's write fuction
-                writeFeatures(datastore, sft, features);
-                // 2.use geomesa-index-api's write fuction
+                // use geomesa-index-api's write fuction
 //                ShardStrategy strategy = new GeoMesaShardStrategy(60);
-
                 writeFeatures2(datastore, sft, features);
             }
         } catch (Exception e) {
@@ -100,18 +95,6 @@ public abstract class GeoMesaInsertWithShard implements Runnable {
             cleanup(datastore, data.getTypeName(), cleanup);
         }
         System.out.println("Done");
-    }
-
-    public DataStore createDataStore(Map<String, String> params) throws IOException {
-        baseInsert.info("加载数据库...");
-
-        // use geotools service loading to get a datastore instance
-        DataStore datastore = DataStoreFinder.getDataStore(params);
-        if (datastore == null) {
-            throw new RuntimeException("Could not create data store with provided parameters");
-        }
-        baseInsert.info("加载数据库成功！");
-        return datastore;
     }
 
     public void ensureSchema(DataStore datastore, TutorialData data) throws IOException {
@@ -126,60 +109,11 @@ public abstract class GeoMesaInsertWithShard implements Runnable {
         return data.getSimpleFeatureType();
     }
 
-    public void createSchema(DataStore datastore, SimpleFeatureType sft) throws IOException {
-        baseInsert.info("创建schema: " + DataUtilities.encodeType(sft));
-        // we only need to do the once - however, calling it repeatedly is a no-op
-        datastore.createSchema(sft);
-//        System.out.println("创建schema成功！");
-//        System.out.println();
-        baseInsert.info("创建schema成功！");
-    }
-
     public List<SimpleFeature> getTestFeatures(TestData data) {
         baseInsert.info("生成测试数据集");
         List<SimpleFeature> features = data.getTestData();
         baseInsert.info("生成测试数据集成功！");
         return features;
-    }
-
-    public void writeFeatures(DataStore datastore, SimpleFeatureType sft, List<SimpleFeature> features) throws IOException {
-        if (features.size() > 0) {
-            baseInsert.info("Start insert data...");
-            double startTime = System.currentTimeMillis();
-            // use try-with-resources to ensure the writer is closed
-            try (FeatureWriter<SimpleFeatureType, SimpleFeature> writer =
-                     datastore.getFeatureWriterAppend(sft.getTypeName(), Transaction.AUTO_COMMIT)) {
-                for (SimpleFeature feature : features) {
-                    // using a geotools writer, you have to get a feature, modify it, then commit it
-                    // appending writers will always return 'false' for haveNext, so we don't need to bother checking
-                    SimpleFeature toWrite = writer.next();
-
-                    // copy attributes
-                    toWrite.setAttributes(feature.getAttributes());
-
-                    // if you want to set the feature ID, you have to cast to an implementation class
-                    // and add the USE_PROVIDED_FID hint to the user data
-                    ((FeatureIdImpl) toWrite.getIdentifier()).setID(feature.getID());
-                    toWrite.getUserData().put(Hints.USE_PROVIDED_FID, Boolean.TRUE);
-//                    logger.info("Hints.USE_PROVIDED_FID is: " + Hints.USE_PROVIDED_FID);
-
-                    // alternatively, you can use the PROVIDED_FID hint directly
-                    // toWrite.getUserData().put(Hints.PROVIDED_FID, feature.getID());
-
-                    // if no feature ID is set, a UUID will be generated for you
-
-                    // make sure to copy the user data, if there is any
-                    toWrite.getUserData().putAll(feature.getUserData());
-
-                    // write the feature
-                    writer.write();
-                }
-            }
-            double endTime = System.currentTimeMillis();
-            baseInsert.info("Insert data success!");
-            baseInsert.info("The base insert program running: " + (endTime - startTime)/1000 + "s; Wrote features: " + features.size());
-//            baseInsert.info("写入测试数据集成功！");
-        }
     }
 
     public void writeFeatures2(DataStore datastore, SimpleFeatureType sft, List<SimpleFeature> features) throws IOException {
