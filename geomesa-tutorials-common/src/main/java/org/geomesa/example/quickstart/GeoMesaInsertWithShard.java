@@ -72,15 +72,19 @@ public abstract class GeoMesaInsertWithShard implements Runnable {
     public void run() {
         ShardGeoMesaDataStore datastore = null;
         try {
+            System.out.println("开始加载数据库...");
             datastore = new ShardGeoMesaDataStore(true);
-            System.out.println(datastore);
+            System.out.println("成功加载数据库...");
+//            System.out.println(datastore);
 
             if (readOnly) {
                 ensureSchema(datastore, data);
             } else {
+                System.out.println("开始建keys");
                 // construct column feature type
                 SimpleFeatureType sft = getSimpleFeatureType(data);
                 // create schema and reserve metadata
+                System.out.println("开始建表");
                 datastore.createSchema(sft);
                 // get test data
                 List<SimpleFeature> features = getTestFeatures(data);
@@ -147,6 +151,7 @@ public abstract class GeoMesaInsertWithShard implements Runnable {
 
                     // write the feature
                     writer.write();
+                    System.out.println("数据写入成功！！！");
                 }
             }
             double endTime = System.currentTimeMillis();
