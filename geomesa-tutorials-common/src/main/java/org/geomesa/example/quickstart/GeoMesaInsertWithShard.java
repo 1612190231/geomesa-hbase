@@ -21,7 +21,11 @@ import org.geotools.data.*;
 import org.geotools.data.simple.SimpleFeatureStore;
 import org.geotools.filter.identity.FeatureIdImpl;
 import org.geotools.util.factory.Hints;
+import org.locationtech.geomesa.hbase.data.HBaseDataStore;
+import org.locationtech.geomesa.index.api.WritableFeature;
+import org.locationtech.geomesa.index.conf.ColumnGroups;
 import org.locationtech.geomesa.index.geotools.GeoMesaDataStore;
+import org.locationtech.geomesa.utils.geotools.FeatureUtils;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.filter.Filter;
@@ -70,11 +74,9 @@ public abstract class GeoMesaInsertWithShard implements Runnable {
 
     @Override
     public void run() {
-        ShardGeoMesaDataStore datastore = null;
+        HBaseDataStore datastore = null;
         try {
-            System.out.println("开始加载数据库...");
-            datastore = new ShardGeoMesaDataStore(true);
-            System.out.println("成功加载数据库...");
+            datastore = createDataStore(params);
 //            System.out.println(datastore);
 
             if (readOnly) {
@@ -86,9 +88,10 @@ public abstract class GeoMesaInsertWithShard implements Runnable {
                 // create schema and reserve metadata
                 System.out.println("开始建表");
                 datastore.createSchema(sft);
+//                System.out.println(sft.getTypeName());
                 // get test data
                 List<SimpleFeature> features = getTestFeatures(data);
-                // use geomesa-index-api's write fuction
+//                writeFeatures(datastore, sft, features);
 //                ShardStrategy strategy = new GeoMesaShardStrategy(60);
                 writeFeatures2(datastore, sft, features);
             }
@@ -99,6 +102,18 @@ public abstract class GeoMesaInsertWithShard implements Runnable {
             cleanup(datastore, data.getTypeName(), cleanup);
         }
         System.out.println("Done");
+    }
+
+    public HBaseDataStore createDataStore(Map<String, String> params) throws IOException {
+        baseInsert.info("加载数据库...");
+
+        // use geotools service loading to get a datastore instance
+        HBaseDataStore datastore = (HBaseDataStore) DataStoreFinder.getDataStore(params);
+        if (datastore == null) {
+            throw new RuntimeException("Could not create data store with provided parameters");
+        }
+        baseInsert.info("加载数据库成功！");
+        return datastore;
     }
 
     public void ensureSchema(DataStore datastore, TutorialData data) throws IOException {
@@ -120,7 +135,7 @@ public abstract class GeoMesaInsertWithShard implements Runnable {
         return features;
     }
 
-    public void writeFeatures2(DataStore datastore, SimpleFeatureType sft, List<SimpleFeature> features) throws IOException {
+    public void writeFeatures(DataStore datastore, SimpleFeatureType sft, List<SimpleFeature> features) throws IOException {
         if (features.size() > 0) {
             baseInsert.info("Start insert data...");
             double startTime = System.currentTimeMillis();
@@ -151,7 +166,25 @@ public abstract class GeoMesaInsertWithShard implements Runnable {
 
                     // write the feature
                     writer.write();
-                    System.out.println("数据写入成功！！！");
+                }
+            }
+            double endTime = System.currentTimeMillis();
+            baseInsert.info("Insert data success!");
+            baseInsert.info("The base insert program running: " + (endTime - startTime)/1000 + "s; Wrote features: " + features.size());
+//            baseInsert.info("写入测试数据集成功！");
+        }
+    }
+
+    public void writeFeatures2(HBaseDataStore datastore, SimpleFeatureType sft, List<SimpleFeature> features) throws IOException {
+        if (features.size() > 0) {
+            baseInsert.info("Start insert data...");
+            double startTime = System.currentTimeMillis();
+            try (FeatureWriter<SimpleFeatureType, SimpleFeature> writer =
+                         datastore.getFeatureWriterAppend(sft.getTypeName(), Transaction.AUTO_COMMIT)) {
+                for (SimpleFeature feature : features) {
+                    ShardStart shardStart = new ShardStart();
+                    shardStart.startShard(sft, feature);
+//                    FeatureUtils.write(writer, feature, true);
                 }
             }
             double endTime = System.currentTimeMillis();

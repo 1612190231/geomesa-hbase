@@ -52,7 +52,7 @@ public class GDELTData implements TutorialData {
     private Filter subsetFilter = null;
 
     public String getTypeName() {
-        return "gdelt-quickstart";
+        return "base-insert";
     }
 
     @Override
